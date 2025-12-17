@@ -3,6 +3,7 @@ package main
 import (
 	"concurrency/miner"
 	"concurrency/postman"
+	"concurrency/worker"
 	"context"
 	"fmt"
 	"sync"
@@ -31,8 +32,8 @@ func main() {
 		postmanCancel()
 	}()
 
-	coalTransferPoint := miner.MinerPool(minerContext, 10)
-	mailTransferPoint := postman.PostmanPool(postmanContext, 10)
+	coalTransferPoint := miner.MinerPool(minerContext, 3)
+	mailTransferPoint := postman.PostmanPool(postmanContext, 3)
 
 	initTime := time.Now()
 
@@ -67,4 +68,29 @@ func main() {
 	mu.Unlock()
 
 	fmt.Println("Затраченное время:", time.Since(initTime))
+
+	// --------------- Классический Worker Pool ---------------
+
+	const numJobs = 5
+	jobs := make(chan int, numJobs)
+	results := make(chan int, numJobs)
+
+	for w := 1; w <= 3; w++ {
+		wg.Add(1)
+		go worker.Worker(wg, w, jobs, results)
+	}
+
+	for i := 1; i <= numJobs; i++ {
+		jobs <- i
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for result := range results {
+		_ = result
+	}
 }
